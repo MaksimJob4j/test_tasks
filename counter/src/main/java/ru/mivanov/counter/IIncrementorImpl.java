@@ -25,10 +25,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Date:   2019/09/04
  */
 public class IIncrementorImpl implements IIncrementor {
-    /** Лок для обеспечения условия counter < maxValue */
-    private final ReadWriteLock lock = new ReentrantReadWriteLock();
     /** Максимальное значение счетчика */
-    private volatile int maximumValue = Integer.MAX_VALUE;
+    private final AtomicInteger  maximumValue = new AtomicInteger(Integer.MAX_VALUE);
     /** Текущее значение счетчика */
     private final AtomicInteger counter = new AtomicInteger(0);
 
@@ -36,7 +34,7 @@ public class IIncrementorImpl implements IIncrementor {
      * @return текущее значение счетчика.
      */
     public int getNumber() {
-        return counter.get();
+        return this.counter.updateAndGet((n) -> n > maximumValue.get() ? 0 : n);
     }
 
     /**
@@ -45,14 +43,8 @@ public class IIncrementorImpl implements IIncrementor {
      * производится обнуление счетчика и отчет начинается заново с 0.
      */
     public void incrementNumber() {
-        this.lock.readLock().lock();
-        try {
-            this.counter.updateAndGet(
-                    (n) -> n < this.maximumValue ? n + 1 : 0);
-        } finally {
-            this.lock.readLock().unlock();
-        }
-
+        this.counter.updateAndGet(
+                (n) -> n < this.maximumValue.get() ? n + 1 : 0);
     }
 
     /**
@@ -69,12 +61,6 @@ public class IIncrementorImpl implements IIncrementor {
                             "Недопустимое значение:%s. Максимальное значение не может быть меньше 0.",
                             maximumValue));
         }
-        this.lock.writeLock().lock();
-        try {
-            this.counter.updateAndGet((n) -> n > maximumValue ? 0 : n);
-            this.maximumValue = maximumValue;
-        } finally {
-            this.lock.writeLock().unlock();
-        }
+        this.maximumValue.set(maximumValue);
     }
 }
